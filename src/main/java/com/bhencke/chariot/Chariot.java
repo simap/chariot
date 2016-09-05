@@ -1,12 +1,12 @@
 package com.bhencke.chariot;
 
-import com.heroicrobot.dropbit.registry.*;
-import com.heroicrobot.dropbit.devices.pixelpusher.Pixel;
 import com.heroicrobot.dropbit.devices.pixelpusher.Strip;
+import com.heroicrobot.dropbit.registry.DeviceRegistry;
 
-import java.awt.*;
-import java.util.*;
 import java.util.List;
+import java.util.Observable;
+import java.util.Observer;
+import java.util.Random;
 
 import static java.lang.Math.*;
 
@@ -16,7 +16,7 @@ import static java.lang.Math.*;
 public class Chariot {
 
     public static void main(String[] args) throws Exception {
-        final boolean[] keepRunning = {true};
+        final boolean[] keepRunning = {true}; //hack for mutability in a final for use with an anon class (thanks intellij)
         Chariot c = new Chariot();
         c.setup();
         Runtime.getRuntime().addShutdownHook(new Thread() {
@@ -30,7 +30,7 @@ public class Chariot {
 
         while(keepRunning[0]) {
             c.draw();
-            Thread.sleep(5);
+            Thread.sleep(5); //updating to local pixel pusher client @ ~200fps, pixel pusher will consume whatever it can
         }
     }
 
@@ -41,6 +41,7 @@ public class Chariot {
     long nextFlashTime = 0;
     boolean isFlashing = false;
 
+    //stolen from example code, this detects pixelpushers automatically
     class TestObserver implements Observer {
         public boolean hasStrips = false;
         public void update(Observable registry, Object updatedDevice) {
@@ -71,10 +72,9 @@ public class Chariot {
         }
 
 
-
-
         // scrape for the strips
         if (testObserver.hasStrips) {
+            //also stolen from example code, not sure why this needs to call these every time
             registry.setExtraDelay(0);
             registry.startPushing();
 
@@ -92,10 +92,12 @@ public class Chariot {
                     int r, g, b;
 
                     double t = System.currentTimeMillis()/1000.0;
-
-
                     double c = sin(t + stripx/5.0 + stripy * PI);
+
+                    //gamma
 //                    c = pow(c, 1.5);
+
+                    //breathing cyan/magenta
                     if (c > 0) {
                         r = b = (int) (255 * (c));
                         g = 0;
@@ -104,12 +106,12 @@ public class Chariot {
                         r = 0;
                     }
 
+                    //quick rolling white for sparkles
                     if (isFlashing) {
                         if (cos(System.currentTimeMillis() / 100.0 - stripx / 10.0) > 0.95) {
                             r = g = b = 255;
                         }
                     }
-
 
                     strip.setPixel(color(r, g, b), stripx);
 

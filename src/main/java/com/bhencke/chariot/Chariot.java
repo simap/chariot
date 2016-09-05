@@ -8,17 +8,38 @@ import java.awt.*;
 import java.util.*;
 import java.util.List;
 
+import static java.lang.Math.*;
+
 /**
  * Created by benh on 8/26/16.
  */
 public class Chariot {
 
-    DeviceRegistry registry;
+    public static void main(String[] args) throws Exception {
+        final boolean[] keepRunning = {true};
+        Chariot c = new Chariot();
+        c.setup();
+        Runtime.getRuntime().addShutdownHook(new Thread() {
+            @Override
+            public void run() {
+                System.out.println("Shutdown hook called");
+                keepRunning[0] = false;
+                c.stop();
+            }
+        });
 
-    int lastPosition;
-    int canvasW = 1024;
-    int canvasH = 600;
-    int stride = 240;
+        while(keepRunning[0]) {
+            c.draw();
+            Thread.sleep(5);
+        }
+    }
+
+    DeviceRegistry registry;
+    TestObserver testObserver;
+    Random rnd = new Random();
+
+    long nextFlashTime = 0;
+    boolean isFlashing = false;
 
     class TestObserver implements Observer {
         public boolean hasStrips = false;
@@ -31,9 +52,6 @@ public class Chariot {
         }
     };
 
-    TestObserver testObserver;
-
-
     void setup() {
         registry = new DeviceRegistry();
         testObserver = new TestObserver();
@@ -42,6 +60,19 @@ public class Chariot {
 
 
     void draw() {
+
+        if (System.currentTimeMillis() > nextFlashTime) {
+            isFlashing = true;
+        }
+
+        if (isFlashing && System.currentTimeMillis() > nextFlashTime + 600) {
+            isFlashing = false;
+            nextFlashTime = System.currentTimeMillis() + 5000 + rnd.nextInt(5000);
+        }
+
+
+
+
         // scrape for the strips
         if (testObserver.hasStrips) {
             registry.setExtraDelay(0);
@@ -52,13 +83,35 @@ public class Chariot {
 
             // for every strip:
             for(Strip strip : strips) {
-                int strides_per_strip = strip.getLength() / stride;
 
                 // for every pixel in the physical strip
                 for (int stripx = 0; stripx < strip.getLength(); stripx++) {
 
-                    int c = Color.HSBtoRGB((float) ((System.currentTimeMillis() % 10000 / 10000.0) + stripx / 10.0), 1f, 1f);
-                    strip.setPixel(c, stripx);
+                    //fade green to red, leave blue on
+
+                    int r, g, b;
+
+                    double t = System.currentTimeMillis()/1000.0;
+
+
+                    double c = sin(t + stripx/5.0 + stripy * PI);
+//                    c = pow(c, 1.5);
+                    if (c > 0) {
+                        r = b = (int) (255 * (c));
+                        g = 0;
+                    } else {
+                        g = b = (int) (255 * abs(c));
+                        r = 0;
+                    }
+
+                    if (isFlashing) {
+                        if (cos(System.currentTimeMillis() / 100.0 - stripx / 10.0) > 0.95) {
+                            r = g = b = 255;
+                        }
+                    }
+
+
+                    strip.setPixel(color(r, g, b), stripx);
 
                 }
                 stripy++;
@@ -66,17 +119,11 @@ public class Chariot {
         }
     }
 
-    public static void main(String[] args) throws Exception {
-        Chariot c = new Chariot();
-        c.setup();
-        while(true) {
-            c.draw();
-            Thread.sleep(5);
-        }
+    private void stop() {
+        registry.stopPushing();
     }
 
     int color(int r, int g, int b) {
-        //bgr
         return b | g<<8 | r<<16;
     }
 
